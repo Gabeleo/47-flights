@@ -4,7 +4,9 @@ import './style.css';
 import { Soundscape } from './audio';
 import { Grabber } from './grab';
 import { Halo } from './halo';
+import type { Level } from './level';
 import { buildOffice } from './office';
+import { buildPantry } from './pantry';
 import { Physics } from './physics';
 import { Player } from './player';
 import { Props, propTemplates } from './props';
@@ -13,6 +15,12 @@ import { Seats } from './seats';
 import { FOG_COLOR, buildSkyline } from './skyline';
 
 await RAPIER.init();
+
+// ?level=pantry for Bloomberg's pantry at 919 Third; the office otherwise.
+const LEVELS: Record<string, () => Level> = { office: buildOffice, pantry: buildPantry };
+const params = new URLSearchParams(location.search);
+const levelName = params.get('level') ?? '';
+const level = (LEVELS[levelName] ?? buildOffice)();
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(1);
@@ -24,15 +32,14 @@ scene.fog = new THREE.FogExp2(FOG_COLOR, 0.0012);
 
 const camera = new THREE.PerspectiveCamera(66, 4 / 3, 0.05, 6000);
 
-const office = buildOffice();
-scene.add(office.group);
-const city = buildSkyline();
+scene.add(level.group);
+const city = buildSkyline(level.elevation);
 scene.add(city.group);
 
-const physics = new Physics(office.colliders);
-const props = new Props(physics, office.props, propTemplates(office.materials));
+const physics = new Physics(level.colliders, level.ground, level.ceiling);
+const props = new Props(physics, level.props, propTemplates(level.materials));
 scene.add(props.group);
-const seats = new Seats(props, physics, Player.radius, Player.halfHeight);
+const seats = new Seats(props, physics, Player.radius, Player.halfHeight, level.walkable);
 
 // Night: cool ambient, moonlight through the glass, orange street glow bouncing up onto the ceiling.
 scene.add(new THREE.AmbientLight(0x7884aa, 0.9));
@@ -45,8 +52,8 @@ scene.add(streetGlow);
 
 const pipeline = new PS1Pipeline(renderer);
 const player = new Player(camera, renderer.domElement, physics, props, seats);
-player.place(office.spawn.x, office.spawn.z, office.spawn.yaw);
-player.surfaceAt = office.surfaceAt;
+player.place(level.spawn.x, level.spawn.z, level.spawn.yaw);
+player.surfaceAt = level.surfaceAt;
 const grabber = new Grabber(camera, physics, props, player, () => seats.body);
 player.carrying = () => grabber.held;
 const halo = new Halo(props);
@@ -69,6 +76,12 @@ resize();
 const overlay = document.getElementById('overlay')!;
 const startLabel = document.getElementById('start-label')!;
 const hud = document.getElementById('hud')!;
+document.getElementById('subtitle')!.innerHTML = level.subtitle;
+// Level links reload the page into another level rather than entering this one.
+for (const a of document.querySelectorAll<HTMLAnchorElement>('#levels a')) {
+  a.classList.toggle('current', a.dataset.level === (levelName in LEVELS ? levelName : 'office'));
+  a.addEventListener('click', (e) => e.stopPropagation());
+}
 
 function setPaused(paused: boolean) {
   overlay.classList.toggle('hidden', !paused);
@@ -85,7 +98,7 @@ overlay.addEventListener('click', () => {
   setPaused(false);
 });
 player.onUnlock = () => setPaused(true);
-if (new URLSearchParams(location.search).has('debug')) setPaused(false);
+if (params.has('debug')) setPaused(false);
 
 let last = performance.now();
 renderer.setAnimationLoop((now: number) => {
@@ -96,7 +109,7 @@ renderer.setAnimationLoop((now: number) => {
   grabber.update(dt);
   physics.step(dt);
   props.sync(dt);
-  office.update(t, dt);
+  level.update(t, dt);
   player.syncCamera(dt);
   halo.update(grabber.focus);
   city.update(t, dt, camera);

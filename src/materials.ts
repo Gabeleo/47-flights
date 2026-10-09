@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { officeTextures } from './textures';
 
 /** Push coplanar overlays (screens, signs, rugs) ahead in depth so vertex snapping can't z-fight them. */
-function decal<T extends THREE.Material>(m: T): T {
+export function decal<T extends THREE.Material>(m: T): T {
   m.polygonOffset = true;
   m.polygonOffsetFactor = -2;
   m.polygonOffsetUnits = -4;
@@ -80,6 +80,14 @@ export function makeMaterials() {
     stair: decal(lam({ map: t.stair })),
     roomA: decal(lam({ map: t.roomA })),
     roomB: decal(lam({ map: t.roomB })),
+    // Loose things from the pantry (see props.ts).
+    bbgKeys: lam({ map: t.bbgKeys }),
+    apple: lam({ color: 0xb8242a }),
+    appleGreen: lam({ color: 0x8cbf3a }),
+    citrus: lam({ color: 0xf08a1c }),
+    banana: lam({ color: 0xf2d23a }),
+    stem: lam({ color: 0x4a3420 }),
+    cupSleeve: lam({ color: 0x9a6a3c }),
   };
 }
 

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { Builder, boxGeo, type Tile } from './geometry';
+import { Builder, boxGeo, type Rect, type SurfaceArea, type Tile } from './geometry';
 import { makeMaterials } from './materials';
+import type { Level } from './level';
 import type { Surface } from './player';
 import type { PropSpawn } from './props';
 import { mulberry32 } from './textures';
@@ -44,10 +45,7 @@ const ARM_POLE_BACK = 0.2;
 
 type DeskKind = 'off' | 'lock' | 'code' | 'dash' | 'empty' | 'mine';
 
-/** Axis-aligned floor rectangle: x0, z0, x1, z1. */
-type Rect = [number, number, number, number];
-
-export function buildOffice() {
+export function buildOffice(): Level {
   const b = new Builder();
   const M = makeMaterials();
   const r = mulberry32(47);
@@ -270,34 +268,12 @@ export function buildOffice() {
 
   // ---------------------------------------------------------------- shell
 
-  // The floor is one grid over the whole plate, laid at the end. Vertex snapping is why: it shifts depth
-  // by centimetres at grazing angles, so a rug even a few millimetres up fights the carpet under it; and
-  // it moves each vertex on its own, so where one piece's corner sits partway along another's edge (a
-  // T-junction), or a floor's edge stops at the foot of a wall, a crack opens onto the city below. So
-  // areas register here instead, the plate is cut along every area's edges into cells that meet only
-  // corner to corner, each cell takes the last area laid over it, and walls stand on top of it.
-  type FloorArea = { mat: THREE.Material; rect: Rect; tile: Tile; origin: [number, number] };
-  const floorAreas: FloorArea[] = [];
-  /**
-   * Floor `mat` over `rect`, its texture repeating every `tile` and anchored so that u = 0 at x = ox and
-   * v = 0 at z = oz (v running toward -z), so the cells it's cut into line up their pattern.
-   */
-  function floor(mat: THREE.Material, rect: Rect, tile: Tile, origin: [number, number] = [0, 0]) {
+  // The floor is one grid over the whole plate (see Builder.surface), laid at the end: areas register
+  // here, each over the last, and walls stand on top of the result.
+  const floorAreas: SurfaceArea[] = [];
+  const floor = (mat: THREE.Material, rect: Rect, tile: Tile, origin?: [number, number]) =>
     floorAreas.push({ mat, rect, tile, origin });
-  }
   floor(M.carpet, [-HX, -HZ, HX, HZ], 1);
-
-  /** One flat floor cell, its UVs from world position as `floor` describes. */
-  function floorCell(mat: THREE.Material, [x0, z0, x1, z1]: Rect, tile: Tile, [ox, oz]: [number, number]) {
-    const [tu, tv] = typeof tile === 'number' ? [tile, tile] : tile;
-    const [cx, cz] = [(x0 + x1) / 2, (z0 + z1) / 2];
-    const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0);
-    const pos = g.attributes.position;
-    const uv = g.attributes.uv as THREE.BufferAttribute;
-    // Laid flat, the plane's local +y points along world -z.
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, (cx + pos.getX(i) - ox) / tu, (oz - (cz - pos.getY(i))) / tv);
-    b.add(g, mat, cx, 0, cz, 0, -Math.PI / 2);
-  }
 
   b.plane(M.ceiling, 40, 28, 0, H, 0, { rx: Math.PI / 2, tile: 0.6 });
 
@@ -596,24 +572,7 @@ export function buildOffice() {
 
   // ---------------------------------------------------------------- floor
 
-  // Cut the plate along every area's edges (see floorAreas) and lay each cell in the last area over it.
-  const cuts = (k: 0 | 1) => {
-    const v = floorAreas.flatMap((f) => [f.rect[k], f.rect[k + 2]]).sort((a, c) => a - c);
-    return v.filter((x, i) => i === 0 || x - v[i - 1] > 1e-6);
-  };
-  const [xs, zs] = [cuts(0), cuts(1)];
-  for (let i = 0; i + 1 < xs.length; i++)
-    for (let j = 0; j + 1 < zs.length; j++) {
-      const cell: Rect = [xs[i], zs[j], xs[i + 1], zs[j + 1]];
-      const [cx, cz] = [(cell[0] + cell[2]) / 2, (cell[1] + cell[3]) / 2];
-      for (let k = floorAreas.length - 1; k >= 0; k--) {
-        const { mat, rect, tile, origin } = floorAreas[k];
-        if (cx > rect[0] && cx < rect[2] && cz > rect[1] && cz < rect[3]) {
-          floorCell(mat, cell, tile, origin);
-          break;
-        }
-      }
-    }
+  b.surface(floorAreas);
 
   // ---------------------------------------------------------------- assemble
 
@@ -638,10 +597,15 @@ export function buildOffice() {
   }
 
   return {
+    subtitle: 'HALCYON &middot; FLOOR 47 &middot; 2:13 AM',
     group,
     colliders: b.colliders,
     props,
     materials: M,
+    ground: [[-25, -20, 25, 20]],
+    ceiling: H,
+    walkable: [-HX + 0.4, -HZ + 0.4, HX - 0.4, HZ - 0.4],
+    elevation: 180,
     update,
     surfaceAt,
     spawn: { x: 0, z: 2.6, yaw: Math.PI },

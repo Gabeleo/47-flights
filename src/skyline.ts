@@ -11,8 +11,6 @@ import {
 
 export const FOG_COLOR = 0x2a2130;
 
-// The office floor is y = 0; the street is 47 storeys down.
-const STREET_Y = -180;
 // Manhattan grid: avenues every 280m along x (30m wide), streets every 80m along z (18m wide).
 const AVE = 280;
 const STR = 80;
@@ -40,8 +38,8 @@ function facadeBox(w: number, h: number, d: number, du: number, dv: number) {
   return g;
 }
 
-/** Max height (from the street) a building at (x, z) may have without hiding a landmark's crown. */
-function viewCap(x: number, z: number) {
+/** Max height (from the street) a building at (x, z) may have without hiding a landmark's crown from y = 0. */
+function viewCap(x: number, z: number, streetY: number) {
   let cap = Infinity;
   for (const [lm, crownY] of [[ESB, 190], [CHRYSLER, 60]] as const) {
     const len = Math.hypot(lm.x, lm.z);
@@ -49,12 +47,14 @@ function viewCap(x: number, z: number) {
     if (along < 20 || along > len - 90) continue;
     const across = Math.abs(x * lm.z - z * lm.x) / len;
     if (across > 50 + along * 0.05) continue;
-    cap = Math.min(cap, -STREET_Y + 1.6 + (along * crownY) / len - 15);
+    cap = Math.min(cap, -streetY + 1.6 + (along * crownY) / len - 15);
   }
   return cap;
 }
 
-export function buildSkyline() {
+/** The city around a floor `elevation` metres above the street; the floor itself is y = 0. */
+export function buildSkyline(elevation: number) {
+  const STREET_Y = -elevation;
   const group = new THREE.Group();
   const r = mulberry32(1947);
 
@@ -92,7 +92,7 @@ export function buildSkyline() {
     } else block(kind, x, z, w, d, 0, h);
     if (r() < 0.45) rooftop(new THREE.BoxGeometry(w * 0.3, 4, d * 0.3), x, h + 2, z);
     if (h < 110 && dist < 800 && r() < 0.22) waterTower(x + (r() - 0.5) * w * 0.4, h, z + (r() - 0.5) * d * 0.4);
-    if (STREET_Y + h > -25) {
+    if (h > 155) {
       const g = new THREE.BoxGeometry(2.5, 2.5, 2.5);
       g.translate(x, STREET_Y + h + 1.5, z);
       beacons.push(g);
@@ -126,7 +126,7 @@ export function buildSkyline() {
                 ? 80 + r() * 110
                 : 14 + r() * r() * 70;
           if (i === 0 && j === 0) h = Math.min(h, 140);
-          h = Math.min(h, viewCap(cx, cz));
+          h = Math.min(h, viewCap(cx, cz, STREET_Y));
           const kind: BuildingKind =
             h > 150 ? (r() < 0.6 ? 'glass' : 'office') : h > 70 ? (r() < 0.5 ? 'office' : 'prewar') : 'prewar';
           building(kind, cx, cz, w - 1 - r() * 3, z1 - z0 - 1 - r() * 3, h, dist);

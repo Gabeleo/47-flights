@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import { Builder } from './geometry';
+import { Builder, boxGeo } from './geometry';
 import type { Mats } from './materials';
 import type { Physics } from './physics';
 
@@ -95,7 +95,50 @@ export function propTemplates(M: Mats): Record<string, Template> {
     damping: [0.6, 2],
   });
 
+  // Fruit from the pantry's trays: light, quick to roll, and slowed down hard so it settles.
+  const fruit = (mat: THREE.Material, r: number, mass: number, stem: boolean): Template => ({
+    build: (b) => {
+      b.sphere(mat, r, 0, r, 0, 0.92);
+      if (stem) b.box(M.stem, 0.006, 0.018, 0.006, 0, r * 1.8, 0);
+    },
+    shapes: () => [RAPIER.ColliderDesc.ball(r).setTranslation(0, r, 0).setMass(mass)],
+    sound: 'soft',
+    damping: [0.3, 2.5],
+    ccd: true,
+  });
+
   return {
+    apple: fruit(M.apple, 0.04, 0.18, true),
+    appleGreen: fruit(M.appleGreen, 0.04, 0.18, true),
+    orange: fruit(M.citrus, 0.042, 0.2, false),
+    // A banana's curve as three segments bending up at the ends.
+    banana: {
+      build: (b) => {
+        b.box(M.banana, 0.022, 0.022, 0.08, 0, 0, 0);
+        for (const s of [-1, 1]) b.add(boxGeo(0.02, 0.02, 0.06), M.banana, 0, 0.024, s * 0.064, 0, -s * 0.45);
+        b.box(M.stem, 0.008, 0.008, 0.02, 0, 0.034, 0.1);
+      },
+      shapes: () => [cuboid(0.012, 0.011, 0.07, 0, 0.011, 0, 0.12)],
+      sound: 'soft',
+      damping: [0.5, 2],
+      ccd: true,
+    },
+    paperCup: {
+      build: (b) => {
+        b.cyl(M.paper, 0.045, 0.032, 0.11, 0, 0, 0, 8);
+        b.cyl(M.cupSleeve, 0.043, 0.037, 0.045, 0, 0.035, 0, 8);
+      },
+      shapes: () => [cylinder(0.04, 0.055, 0, 0.055, 0, 0.02)],
+      sound: 'paper',
+      damping: [2, 3],
+      ccd: true,
+    },
+    // Bloomberg's own keyboard: heavier than it looks.
+    bbgKeyboard: {
+      build: (b) => b.box(M.black, 0.46, 0.028, 0.17, 0, 0, 0, { faces: { py: { mat: M.bbgKeys } } }),
+      shapes: () => [cuboid(0.23, 0.014, 0.085, 0, 0.014, 0, 1.4)],
+      sound: 'plastic',
+    },
     chair,
     chairHoodie: {
       ...chair,

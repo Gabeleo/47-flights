@@ -527,6 +527,95 @@ export function officeTextures() {
     }),
     roomA: sign(48, 16, 36, '#f4f6f8', '#1e2a33', 'ATLAS', 10),
     roomB: sign(48, 16, 37, '#f4f6f8', '#1e2a33', 'ORION', 10),
+    // A Bloomberg keyboard from above: grey keys on black, the yellow market-sector keys across the top,
+    // red CONN DFLT and CANCEL on the left, green GO where enter would be.
+    bbgKeys: canvasTexture(64, 24, 64, (c) => {
+      rect(c, '#18191c', 0, 0, 64, 24);
+      for (let x = 2; x < 50; x += 4) rect(c, '#e0b02a', x, 2, 3, 3);
+      rect(c, '#c4302a', 2, 7, 3, 3);
+      rect(c, '#c4302a', 2, 11, 3, 3);
+      for (let row = 0; row < 4; row++)
+        for (let x = 7; x < 50; x += 3) rect(c, '#5a5d63', x, 7 + row * 4, 2, 3);
+      rect(c, '#2f9a48', 44, 15, 5, 7);
+      for (let y = 7; y < 22; y += 4) for (let x = 53; x < 62; x += 3) rect(c, '#5a5d63', x, y, 2, 3);
+    }),
+  };
+}
+
+/** Bloomberg's pantry at 919 Third: its stone, timber, fridges, terminals and reef. */
+export function pantryTextures() {
+  return {
+    // Large grey porcelain tiles, 1.2m x 0.6m: faint veining and a hairline joint.
+    porcelain: canvasTexture(32, 16, 70, (c, r) => {
+      grain(c, r, 32, 16, [104, 104, 102], 4, 0.6);
+      for (let i = 0; i < 3; i++) line(c, 'rgba(140,140,136,0.35)', [Math.floor(r() * 32), 0, Math.floor(r() * 32), 15]);
+      rect(c, '#55575a', 0, 0, 32, 1);
+      rect(c, '#55575a', 0, 0, 1, 16);
+    }),
+    // Walnut, grain running along u.
+    walnut: canvasTexture(64, 16, 71, (c, r) => {
+      for (let y = 0; y < 16; y++) {
+        const k = Math.sin(y * 1.3 + r()) * 8 + (r() - 0.5) * 6;
+        rect(c, rgb([98 + k, 60 + k * 0.6, 36 + k * 0.4]), 0, y, 64, 1);
+      }
+      for (let i = 0; i < 40; i++) rect(c, 'rgba(40,20,10,0.35)', Math.floor(r() * 64), Math.floor(r() * 16), 3 + Math.floor(r() * 9), 1);
+    }),
+    // The ceiling slats: warm teak, grain along u.
+    teak: canvasTexture(32, 8, 72, (c, r) => {
+      for (let y = 0; y < 8; y++) {
+        const k = (r() - 0.5) * 14;
+        rect(c, rgb([178 + k, 104 + k * 0.7, 56 + k * 0.4]), 0, y, 32, 1);
+      }
+      for (let i = 0; i < 14; i++) rect(c, 'rgba(90,44,18,0.4)', Math.floor(r() * 32), Math.floor(r() * 8), 2 + Math.floor(r() * 6), 1);
+    }),
+    // Glass-door drinks fridge, lit inside: five shelves of cans and bottles behind a steel frame.
+    fridge: canvasTexture(32, 64, 73, (c, r) => {
+      rect(c, '#9aa0a8', 0, 0, 32, 64);
+      rect(c, '#e8eef2', 2, 2, 28, 60);
+      const drinks = ['#d8262c', '#2a7fd4', '#f2c230', '#3fae5a', '#f0f0f0', '#e8742a', '#7a3fa0', '#1c1c1c'];
+      for (let s = 0; s < 5; s++) {
+        const y = 4 + s * 12;
+        rect(c, '#b9c0c6', 2, y + 10, 28, 1);
+        for (let x = 3; x < 29; x += 3) {
+          const tall = r() < 0.4;
+          rect(c, drinks[Math.floor(r() * drinks.length)], x, y + (tall ? 1 : 4), 2, tall ? 9 : 6);
+        }
+      }
+      rect(c, 'rgba(255,255,255,0.35)', 4, 2, 1, 60);
+      rect(c, '#6f757c', 15, 2, 2, 60);
+    }),
+    // Cereal behind a dispenser's clear canister.
+    cereal: canvasTexture(8, 16, 74, (c, r) => {
+      grain(c, r, 8, 16, [176, 120, 54], 30);
+      for (let i = 0; i < 6; i++) rect(c, '#e8d6a8', Math.floor(r() * 8), Math.floor(r() * 16), 1, 1);
+    }),
+    // A Bloomberg Terminal left on overnight: amber on black, white headings, green and red figures.
+    terminal: canvasTexture(64, 48, 75, (c, r) => {
+      rect(c, '#050505', 0, 0, 64, 48);
+      rect(c, '#d84a1c', 0, 0, 64, 3);
+      rect(c, '#ffffff', 2, 1, 14, 1);
+      rect(c, '#2a2a2a', 0, 4, 64, 3);
+      rect(c, '#ffa028', 2, 5, 22, 1);
+      for (let y = 9; y < 46; y += 2) {
+        const head = (y - 9) % 12 === 0;
+        rect(c, head ? '#ffffff' : '#ffa028', 2, y, head ? 12 : 6 + Math.floor(r() * 16), 1);
+        if (head) continue;
+        rect(c, '#ffa028', 30, y, 8, 1);
+        rect(c, r() < 0.5 ? '#3fdd5a' : '#ff3a2a', 42, y, 6, 1);
+        rect(c, '#c8c8c8', 52, y, 8, 1);
+      }
+    }),
+    // Roller shade fabric: grey with a faint vertical weave.
+    shade: canvasTexture(16, 16, 76, (c, r) => {
+      grain(c, r, 16, 16, [122, 124, 126], 5);
+      for (let x = 0; x < 16; x += 2) rect(c, 'rgba(0,0,0,0.08)', x, 0, 1, 16);
+    }),
+    // Live rock in the reef tank: purple coralline with pink and green flecks.
+    liveRock: canvasTexture(16, 16, 77, (c, r) => {
+      grain(c, r, 16, 16, [92, 58, 140], 22);
+      for (let i = 0; i < 18; i++) rect(c, r() < 0.5 ? '#d070b8' : '#6fc08a', Math.floor(r() * 16), Math.floor(r() * 16), 1, 1);
+    }),
+    sand: canvasTexture(16, 16, 78, (c, r) => grain(c, r, 16, 16, [222, 218, 204], 12)),
   };
 }
 

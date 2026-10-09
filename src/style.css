@@ -77,3 +77,20 @@ canvas {
 #overlay .keys + .keys {
   margin-top: 6px;
 }
+
+#overlay .levels {
+  margin-top: 34px;
+  font-size: 22px;
+  letter-spacing: 0.15em;
+  color: #55606e;
+}
+
+#overlay .levels a {
+  color: #7d8794;
+  text-decoration: none;
+}
+
+#overlay .levels a:hover,
+#overlay .levels a.current {
+  color: #eef1f6;
+}

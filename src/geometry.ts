@@ -7,6 +7,9 @@ export type Tile = number | [number, number];
 /** Solid box turned by `yaw` about its centre (x, z), solid from y0 to y1; becomes a fixed collider in the physics world. */
 export type Collider = { x: number; z: number; hw: number; hd: number; yaw: number; y0: number; y1: number };
 
+/** Axis-aligned rectangle on the floor plan: x0, z0, x1, z1. */
+export type Rect = [number, number, number, number];
+
 /** Default top of a collider registered without a height: floor to ceiling. */
 const FULL_HEIGHT = 2.8;
 
@@ -122,6 +125,13 @@ export function mergeToMesh(geos: THREE.BufferGeometry[], mat: THREE.Material) {
   mesh.matrixAutoUpdate = false;
   return mesh;
 }
+
+/**
+ * One area of a floor or ceiling (see Builder.surface): `mat` over `rect`, its texture repeating every
+ * `tile` and anchored so that u = 0 at x = ox and v = 0 at z = oz (v running toward -z), so the cells it's
+ * cut into line up their pattern. No material leaves the area open.
+ */
+export type SurfaceArea = { mat: THREE.Material | null; rect: Rect; tile: Tile; origin?: [number, number] };
 
 const _m = new THREE.Matrix4();
 const _m2 = new THREE.Matrix4();
@@ -250,6 +260,42 @@ export class Builder {
     }
     this.batches.clear();
     return out;
+  }
+
+  /**
+   * A horizontal surface over `areas`, laid as one conforming grid. Vertex snapping is why: it shifts depth
+   * by centimetres at grazing angles, so a rug even a few millimetres up fights the carpet under it; and it
+   * moves each vertex on its own, so where one piece's corner sits partway along another's edge (a
+   * T-junction), or a floor's edge stops at the foot of a wall, a crack opens onto the void. So the surface
+   * is cut along every area's edges into cells that meet only corner to corner, and each cell takes the last
+   * area laid over it; an area with no material leaves its cells open (a stairwell).
+   */
+  surface(areas: SurfaceArea[], y = 0, facing: 'up' | 'down' = 'up') {
+    const cuts = (k: 0 | 1) => {
+      const v = areas.flatMap((a) => [a.rect[k], a.rect[k + 2]]).sort((a, c) => a - c);
+      return v.filter((x, i) => i === 0 || x - v[i - 1] > 1e-6);
+    };
+    const [xs, zs] = [cuts(0), cuts(1)];
+    for (let i = 0; i + 1 < xs.length; i++)
+      for (let j = 0; j + 1 < zs.length; j++) {
+        const [x0, z0, x1, z1] = [xs[i], zs[j], xs[i + 1], zs[j + 1]];
+        const [cx, cz] = [(x0 + x1) / 2, (z0 + z1) / 2];
+        for (let k = areas.length - 1; k >= 0; k--) {
+          const { mat, rect, tile, origin = [0, 0] } = areas[k];
+          if (!(cx > rect[0] && cx < rect[2] && cz > rect[1] && cz < rect[3])) continue;
+          if (mat) {
+            const [tu, tv] = tileSize(tile);
+            const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0);
+            g.rotateX(facing === 'up' ? -Math.PI / 2 : Math.PI / 2);
+            const pos = g.attributes.position;
+            const uv = g.attributes.uv as THREE.BufferAttribute;
+            for (let n = 0; n < uv.count; n++)
+              uv.setXY(n, (cx + pos.getX(n) - origin[0]) / tu, (origin[1] - (cz + pos.getZ(n))) / tv);
+            this.add(g, mat, cx, y, cz);
+          }
+          break;
+        }
+      }
   }
 
   build() {
