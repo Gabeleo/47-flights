@@ -83,3 +83,30 @@ export const stairWalk = (x0: number, x1: number, z0: number, y0: number, z1: nu
   rect: [Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1)],
   at: (_x, z) => y0 + ((y1 - y0) * (z - z0)) / (z1 - z0),
 });
+
+/** An axis-aligned rectangle on the ground: x0, z0, x1, z1. */
+export type Rect = [number, number, number, number];
+
+/** One block of the avenue: the x extent of its frontage and of its roadway, and the cross streets at each end. */
+export type Block = { x0: number; x1: number; road0: number; road1: number; west?: CrossStreet; east?: CrossStreet };
+
+/** The avenue's blocks west to east: 0 is west of 29th, 1 is 29th-30th ... 5 is 33rd-34th, 6 east of 34th. */
+export const BLOCKS: Block[] = Array.from({ length: STREETS.length + 1 }, (_, i) => {
+  const w = STREETS[i - 1];
+  const e = STREETS[i];
+  return {
+    x0: w ? w.x + w.lot : WEST_END - END_REACH,
+    x1: e ? e.x - e.lot : EAST_END + END_REACH,
+    road0: w ? w.x + w.road : WEST_END - END_REACH,
+    road1: e ? e.x - e.road : EAST_END + END_REACH,
+    west: w,
+    east: e,
+  };
+});
+
+/** Column positions of the el up and down 31st, so cars don't park into them. */
+export const EL_COLUMNS: [number, number][] = (() => {
+  const out: [number, number][] = [];
+  for (let z = 11.5; z < CROSS_REACH; z += 15) for (const s of [-1, 1]) for (const e of [-1, 1]) out.push([EL.x + e * EL.columns, s * z]);
+  return out;
+})();

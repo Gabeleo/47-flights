@@ -1,7 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import type { Template } from './props';
-import type { StreetMats } from './streetTextures';
+import type { Template } from '../props';
+import type { StreetMats } from './materials';
 
 // Loose things on the sidewalk at 2am: litter baskets, the night's garbage out at the curb, crates and a
 // chair outside the deli, a few cones, and whatever people dropped.

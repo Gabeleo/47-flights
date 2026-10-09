@@ -1,11 +1,11 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import type { Soundscape } from './audio';
-import { Builder } from './geometry';
-import type { Physics } from './physics';
-import type { StreetMats } from './streetTextures';
-import { AVE_ROAD, CROSSWALK, LANE, STREETS, type CrossStreet } from './streetPlan';
-import type { Rand } from './textures';
+import type { Soundscape } from '../audio';
+import { Builder } from '../geometry';
+import type { Physics } from '../physics';
+import type { StreetMats } from './materials';
+import { AVE_ROAD, CROSSWALK, LANE, STREETS, type CrossStreet } from './plan';
+import type { Rand } from '../textures';
 
 // Cars, parked and moving, and the signals they obey. Signalized corners run a fixed cycle, offset
 // block to block so a car doing the limit eastbound mostly makes the greens. The other cross streets

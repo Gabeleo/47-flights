@@ -126,6 +126,13 @@ export function mergeToMesh(geos: THREE.BufferGeometry[], mat: THREE.Material) {
   return mesh;
 }
 
+/** Box from a to c (x, y, z) of section w x h, for knee braces, stair stringers and lamp arms. */
+export function strut(b: Builder, mat: THREE.Material, a: number[], c: number[], w: number, h: number) {
+  const [dx, dy, dz] = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  const flat = Math.hypot(dx, dz);
+  b.add(boxGeo(w, h, Math.hypot(flat, dy)), mat, (a[0] + c[0]) / 2, (a[1] + c[1]) / 2, (a[2] + c[2]) / 2, Math.atan2(dx, dz), -Math.atan2(dy, flat));
+}
+
 const _m = new THREE.Matrix4();
 const _m2 = new THREE.Matrix4();
 const _e = new THREE.Euler();

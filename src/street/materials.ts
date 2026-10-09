@@ -10,7 +10,7 @@ import {
   type Ctx,
   type Rand,
   type RGB,
-} from './textures';
+} from '../textures';
 
 // Everything on 36th Avenue, drawn at the same PS1 resolutions as the office.
 

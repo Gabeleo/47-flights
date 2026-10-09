@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import type { Soundscape } from './audio';
-import { Builder, boxGeo } from './geometry';
-import type { StreetMats } from './streetTextures';
-import { EL } from './streetPlan';
-import type { Rand } from './textures';
+import type { Soundscape } from '../audio';
+import { Builder, strut } from '../geometry';
+import type { Glow } from './lightPool';
+import type { StreetMats } from './materials';
+import { EL } from './plan';
+import type { Rand } from '../textures';
 
 // The Astoria Line over 31st Street: steel bents in the roadway and three tracks on plate girders, and
 // the N or W that comes through every minute or two and stops at 36 Av. The station is station.ts.
@@ -19,16 +20,6 @@ const DECEL = 1.1;
 const ACCEL_OUT = 1.3;
 const DWELL = 20;
 const RUN_OUT = 420;
-
-/** A light source the street's lighting can pick up: where it is, its colour, how strong and how far. */
-export type Glow = { pos: THREE.Vector3; color: number; intensity: number; distance: number };
-
-/** Box from a to b (x, y, z) of section w x h, for knee braces and stair stringers. */
-export function strut(b: Builder, mat: THREE.Material, a: number[], c: number[], w: number, h: number) {
-  const [dx, dy, dz] = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-  const flat = Math.hypot(dx, dz);
-  b.add(boxGeo(w, h, Math.hypot(flat, dy)), mat, (a[0] + c[0]) / 2, (a[1] + c[1]) / 2, (a[2] + c[2]) / 2, Math.atan2(dx, dz), -Math.atan2(dy, flat));
-}
 
 export function buildEl(b: Builder, M: StreetMats, r: Rand, sound: Soundscape) {
   const glows: Glow[] = [];

@@ -1,13 +1,13 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import type { Soundscape } from './audio';
-import { strut, type Glow } from './el';
-import { Builder, type BoxFace } from './geometry';
-import type { Physics } from './physics';
-import type { Action } from './player';
-import type { PropSpawn } from './props';
-import { CURB, EL, flatWalk, stairWalk, type Walk } from './streetPlan';
-import type { StreetMats } from './streetTextures';
+import type { Soundscape } from '../audio';
+import { Builder, strut, type BoxFace } from '../geometry';
+import type { Glow } from './lightPool';
+import type { Physics } from '../physics';
+import type { Action } from '../player';
+import type { PropSpawn } from '../props';
+import { CURB, EL, flatWalk, stairWalk, type Walk } from './plan';
+import type { StreetMats } from './materials';
 
 // 36 Av on the Astoria Line. Street stairs climb the 31st Street sidewalks from three corners (none on
 // the north-east) to landings that bridge into the station house slung under the tracks over the
