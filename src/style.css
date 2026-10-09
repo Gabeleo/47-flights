@@ -77,3 +77,24 @@ canvas {
 #overlay .keys + .keys {
   margin-top: 6px;
 }
+
+#overlay .scenes {
+  margin-top: 36px;
+  font-size: 24px;
+  letter-spacing: 0.15em;
+  color: #5b6573;
+}
+
+#overlay .scenes a {
+  color: #8fa3b3;
+  text-decoration: none;
+}
+
+#overlay .scenes a:hover {
+  color: #eef1f6;
+}
+
+#overlay .scenes a.current {
+  color: #eef1f6;
+  text-shadow: 2px 2px 0 #1e525c;
+}

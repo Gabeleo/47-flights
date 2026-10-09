@@ -6,6 +6,9 @@ import type { Seats } from './seats';
 
 export type Surface = 'carpet' | 'wood' | 'stone';
 
+/** Something the player can do where they're standing, offered on the HUD and done with E. */
+export type Action = { prompt: string; act?: () => void };
+
 const EYE = 1.65;
 const RADIUS = 0.28;
 /** Half the straight section of the capsule; total height is 2 * (HALF_HEIGHT + RADIUS). */
@@ -50,6 +53,13 @@ export class Player {
   onStep: (surface: Surface, running: boolean) => void = () => {};
   /** The floor underfoot at a point, for footstep sounds. */
   surfaceAt: (x: number, z: number) => Surface = () => 'carpet';
+  /**
+   * Height of the ground at a point for someone whose feet are at y: up on a sidewalk, down in the
+   * road, or whichever floor of a building they're on.
+   */
+  heightAt: (x: number, z: number, y: number) => number = () => 0;
+  /** Whatever there is to do here besides sitting down, if anything. */
+  actionAt: (x: number, z: number, y: number, yaw: number) => Action | null = () => null;
   onSit: () => void = () => {};
   onStand: () => void = () => {};
   onUnlock: () => void = () => {};
@@ -68,6 +78,11 @@ export class Player {
   private notice = '';
   private noticeTime = 0;
   private eye = new THREE.Vector3();
+  /** Height of the ground underfoot, and the same eased so stepping up a curb doesn't snap the view. */
+  private ground = 0;
+  private groundY = 0;
+  private action: Action | null = null;
+  private physics: Physics;
 
   constructor(
     private camera: THREE.PerspectiveCamera,
@@ -76,6 +91,7 @@ export class Player {
     private props: Props,
     private seats: Seats,
   ) {
+    this.physics = physics;
     const world = physics.world;
     this.body = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, CENTER_Y, 0));
     this.collider = world.createCollider(RAPIER.ColliderDesc.capsule(HALF_HEIGHT, RADIUS), this.body);
@@ -110,10 +126,12 @@ export class Player {
     Promise.resolve(this.dom.requestPointerLock()).catch(() => {});
   }
 
-  place(x: number, z: number, yaw: number, pitch = 0) {
+  /** Put the player at (x, z) on the floor nearest above height `level`, facing yaw. */
+  place(x: number, z: number, yaw: number, pitch = 0, level = 0) {
     if (this.seated) this.seats.release(x, z);
     this.seated = false;
     this.blend = null;
+    this.ground = level;
     this.teleport(x, z);
     this.yaw = yaw;
     this.pitch = pitch;
@@ -155,8 +173,10 @@ export class Player {
     }
     const mv = this.kcc.computedMovement();
     const t = this.body.translation();
-    this.body.setNextKinematicTranslation({ x: t.x + mv.x, y: CENTER_Y, z: t.z + mv.z });
-    this.pos.set(t.x + mv.x, 0, t.z + mv.z);
+    this.ground = this.heightAt(t.x + mv.x, t.z + mv.z, this.ground);
+    this.groundY += (this.ground - this.groundY) * (1 - Math.exp(-dt * 18));
+    this.body.setNextKinematicTranslation({ x: t.x + mv.x, y: this.ground + CENTER_Y, z: t.z + mv.z });
+    this.pos.set(t.x + mv.x, this.ground, t.z + mv.z);
     // Keep only the velocity we actually achieved, so leaning on a wall doesn't build up speed.
     if (dt > 0) this.vel.set(mv.x / dt, mv.z / dt);
 
@@ -166,7 +186,8 @@ export class Player {
     if (Math.floor(this.phase / Math.PI) !== before && speed > 0.4) this.onStep(this.surface(), running);
 
     this.target = this.blend || held ? null : this.seats.pick(this.pos.x, this.pos.z, this.yaw, held);
-    this.setPrompt(this.target ? '[E] SIT' : '');
+    this.action = this.target || this.blend ? null : this.actionAt(this.pos.x, this.pos.z, this.ground, this.yaw);
+    this.setPrompt(this.target ? '[E] SIT' : (this.action?.prompt ?? ''));
   }
 
   /** Place the camera; call after the physics step so a seated view rides the chair exactly. */
@@ -175,7 +196,7 @@ export class Player {
     if (this.seated) this.seats.seatEye(this.eye);
     else {
       const amp = this.blend ? 0 : Math.min(1, this.vel.length() / WALK);
-      this.eye.set(this.pos.x, EYE + (Math.abs(Math.sin(this.phase)) - 0.5) * 0.05 * amp, this.pos.z);
+      this.eye.set(this.pos.x, this.groundY + EYE + (Math.abs(Math.sin(this.phase)) - 0.5) * 0.05 * amp, this.pos.z);
       roll = Math.sin(this.phase) * 0.006 * amp;
     }
     const b = this.blend;
@@ -192,7 +213,7 @@ export class Player {
 
   private blocks(c: RAPIER.Collider, held: Prop | null) {
     const prop = this.props.propOf(c);
-    if (!prop) return true;
+    if (!prop) return !this.physics.isGround(c);
     if (prop === held || prop.body === this.seats.body) return false;
     return prop.body.isFixed() || prop.body.mass() >= LIGHT_MASS;
   }
@@ -219,6 +240,7 @@ export class Player {
     if (this.blend || this.carrying()) return;
     if (this.seated) this.standUp();
     else if (this.target) this.sitDown(this.target);
+    else this.action?.act?.();
   }
 
   private sitDown(chair: Prop) {
@@ -250,11 +272,12 @@ export class Player {
   }
 
   private teleport(x: number, z: number) {
-    const p = { x, y: CENTER_Y, z };
+    this.ground = this.groundY = this.heightAt(x, z, this.ground);
+    const p = { x, y: this.ground + CENTER_Y, z };
     this.body.setTranslation(p, true);
     this.body.setNextKinematicTranslation(p);
     this.collider.setEnabled(true);
-    this.pos.set(x, 0, z);
+    this.pos.set(x, this.ground, z);
     this.vel.set(0, 0);
   }
 

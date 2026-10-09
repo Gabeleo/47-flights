@@ -1,15 +1,12 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import type { Physics } from './physics';
+import type { Bounds, Physics } from './physics';
 import type { Prop, Props } from './props';
 
 const SEAT_EYE = 1.17;
 const SIT_REACH = 1.7;
 /** Extra mass while someone sits in a chair, so it shoves other things instead of bouncing off. */
 const SITTER_MASS = 70;
-/** The walkable floor, inside the window radiators. */
-const FLOOR_HX = 19.6;
-const FLOOR_HZ = 13.6;
 
 const _q = new THREE.Quaternion();
 const _up = new THREE.Vector3(0, 1, 0);
@@ -35,6 +32,8 @@ export class Seats {
     private physics: Physics,
     private playerRadius: number,
     private playerHalfHeight: number,
+    /** Where the player may stand. */
+    private floor: Bounds,
   ) {
     this.standShape = new RAPIER.Capsule(playerHalfHeight, playerRadius);
   }
@@ -133,15 +132,17 @@ export class Seats {
     for (const [lx, lz] of offsets) {
       const x = t.x + lx * c + lz * s;
       const z = t.z - lx * s + lz * c;
-      if (Math.abs(x) > FLOOR_HX - r || Math.abs(z) > FLOOR_HZ - r) continue;
+      const [x0, z0, x1, z1] = this.floor;
+      if (x < x0 + r || x > x1 - r || z < z0 + r || z > z1 - r) continue;
       const blocked = this.physics.world.intersectionWithShape(
-        { x, y: this.playerHalfHeight + r + 0.03, z },
+        { x, y: Math.max(0, t.y) + this.playerHalfHeight + r + 0.03, z },
         { x: 0, y: 0, z: 0, w: 1 },
         this.standShape,
         RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
         undefined,
         undefined,
         b,
+        (c) => !this.physics.isGround(c),
       );
       if (!blocked) return { x, z };
     }

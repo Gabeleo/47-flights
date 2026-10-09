@@ -225,35 +225,8 @@ export function buildSkyline() {
 
   // ---------------------------------------------------------------- sky
 
-  const skyGeo = new THREE.SphereGeometry(4000, 24, 12);
-  const skyPos = skyGeo.attributes.position as THREE.BufferAttribute;
-  const below = new THREE.Color(0x120e12);
-  const horizon = new THREE.Color(0x3b2a36);
-  const mid = new THREE.Color(0x1c1b2c);
-  const zenith = new THREE.Color(0x06080f);
-  const colors: number[] = [];
-  const c = new THREE.Color();
-  for (let i = 0; i < skyPos.count; i++) {
-    const t = skyPos.getY(i) / 4000;
-    if (t < 0) c.copy(horizon).lerp(below, Math.min(1, -t * 6));
-    else if (t < 0.18) c.copy(horizon).lerp(mid, t / 0.18);
-    else c.copy(mid).lerp(zenith, Math.min(1, (t - 0.18) / 0.5));
-    colors.push(c.r, c.g, c.b);
-  }
-  skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const sky = new THREE.Mesh(
-    skyGeo,
-    new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }),
-  );
-  sky.renderOrder = -1;
-  sky.userData.noSnap = true;
+  const sky = buildSky();
   group.add(sky);
-
-  const moon = new THREE.Mesh(new THREE.CircleGeometry(55, 12), new THREE.MeshBasicMaterial({ color: 0xe8e4d6, fog: false }));
-  moon.position.set(-0.45, 0.2, 0.87).normalize().multiplyScalar(3500);
-  moon.lookAt(0, 0, 0);
-  moon.userData.noSnap = true;
-  sky.add(moon);
 
   function update(t: number, dt: number, camera: THREE.Camera) {
     sky.position.copy(camera.position);
@@ -282,4 +255,41 @@ export function buildSkyline() {
   }
 
   return { group, update };
+}
+
+/**
+ * The night sky: a gradient dome that glows over the city at the horizon, with the moon. Follows the
+ * camera, so set its position to the camera's every frame.
+ */
+export function buildSky() {
+  const skyGeo = new THREE.SphereGeometry(4000, 24, 12);
+  const skyPos = skyGeo.attributes.position as THREE.BufferAttribute;
+  const below = new THREE.Color(0x120e12);
+  const horizon = new THREE.Color(0x3b2a36);
+  const mid = new THREE.Color(0x1c1b2c);
+  const zenith = new THREE.Color(0x06080f);
+  const colors: number[] = [];
+  const c = new THREE.Color();
+  for (let i = 0; i < skyPos.count; i++) {
+    const t = skyPos.getY(i) / 4000;
+    if (t < 0) c.copy(horizon).lerp(below, Math.min(1, -t * 6));
+    else if (t < 0.18) c.copy(horizon).lerp(mid, t / 0.18);
+    else c.copy(mid).lerp(zenith, Math.min(1, (t - 0.18) / 0.5));
+    colors.push(c.r, c.g, c.b);
+  }
+  skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const sky = new THREE.Mesh(
+    skyGeo,
+    new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }),
+  );
+  sky.renderOrder = -1;
+  sky.userData.noSnap = true;
+
+  const moon = new THREE.Mesh(new THREE.CircleGeometry(55, 12), new THREE.MeshBasicMaterial({ color: 0xe8e4d6, fog: false }));
+  moon.position.set(-0.45, 0.2, 0.87).normalize().multiplyScalar(3500);
+  moon.lookAt(0, 0, 0);
+  moon.userData.noSnap = true;
+  sky.add(moon);
+
+  return sky;
 }

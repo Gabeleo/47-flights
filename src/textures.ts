@@ -3,8 +3,8 @@ import * as THREE from 'three';
 // All textures are drawn procedurally at PS1-ish resolutions and sampled with nearest filtering.
 
 export type Rand = () => number;
-type Ctx = CanvasRenderingContext2D;
-type RGB = [number, number, number];
+export type Ctx = CanvasRenderingContext2D;
+export type RGB = [number, number, number];
 
 export function mulberry32(seed: number): Rand {
   let a = seed >>> 0;
@@ -18,10 +18,10 @@ export function mulberry32(seed: number): Rand {
 }
 
 const clamp255 = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-const rgb = (c: RGB, k = 0) => `rgb(${clamp255(c[0] + k)},${clamp255(c[1] + k)},${clamp255(c[2] + k)})`;
-const scaleRGB = (c: RGB, s: number) => `rgb(${clamp255(c[0] * s)},${clamp255(c[1] * s)},${clamp255(c[2] * s)})`;
+export const rgb = (c: RGB, k = 0) => `rgb(${clamp255(c[0] + k)},${clamp255(c[1] + k)},${clamp255(c[2] + k)})`;
+export const scaleRGB = (c: RGB, s: number) => `rgb(${clamp255(c[0] * s)},${clamp255(c[1] * s)},${clamp255(c[2] * s)})`;
 
-function canvasTexture(
+export function canvasTexture(
   w: number,
   h: number,
   seed: number,
@@ -42,18 +42,18 @@ function canvasTexture(
   return t;
 }
 
-function rect(c: Ctx, color: string, x: number, y: number, w: number, h: number) {
+export function rect(c: Ctx, color: string, x: number, y: number, w: number, h: number) {
   c.fillStyle = color;
   c.fillRect(x, y, w, h);
 }
 
-function grain(c: Ctx, r: Rand, w: number, h: number, base: RGB, amount: number, density = 1) {
+export function grain(c: Ctx, r: Rand, w: number, h: number, base: RGB, amount: number, density = 1) {
   rect(c, rgb(base), 0, 0, w, h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) if (r() < density) rect(c, rgb(base, (r() - 0.5) * 2 * amount), x, y, 1, 1);
 }
 
-function label(c: Ctx, text: string, x: number, y: number, size: number, color: string, weight = 'bold') {
+export function label(c: Ctx, text: string, x: number, y: number, size: number, color: string, weight = 'bold') {
   c.fillStyle = color;
   c.font = `${weight} ${size}px Helvetica, Arial, sans-serif`;
   c.textAlign = 'center';
@@ -61,7 +61,7 @@ function label(c: Ctx, text: string, x: number, y: number, size: number, color: 
   c.fillText(text, x, y);
 }
 
-function line(c: Ctx, color: string, pts: number[]) {
+export function line(c: Ctx, color: string, pts: number[]) {
   c.strokeStyle = color;
   c.lineWidth = 1;
   c.beginPath();
@@ -71,7 +71,7 @@ function line(c: Ctx, color: string, pts: number[]) {
 }
 
 /** Brushed metal: vertical grain with a few bright streaks. */
-function brushed(seed: number, base: RGB) {
+export function brushed(seed: number, base: RGB) {
   return canvasTexture(16, 32, seed, (c, r) => {
     for (let x = 0; x < 16; x++) rect(c, rgb(base, (r() - 0.5) * 22), x, 0, 1, 32);
     for (let i = 0; i < 30; i++) rect(c, 'rgba(255,255,255,0.08)', Math.floor(r() * 16), Math.floor(r() * 32), 1, 4);
@@ -99,7 +99,7 @@ function slats(seed: number) {
 }
 
 /** Path round a w x h rectangle at (x, y) with corners of radius rad. */
-function roundRect(c: Ctx, x: number, y: number, w: number, h: number, rad: number) {
+export function roundRect(c: Ctx, x: number, y: number, w: number, h: number, rad: number) {
   c.beginPath();
   c.moveTo(x + rad, y);
   c.arcTo(x + w, y, x + w, y + h, rad);

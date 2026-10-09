@@ -4,8 +4,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 /** World-space size of one texture repeat; a single number means square tiles. */
 export type Tile = number | [number, number];
 
-/** Solid box turned by `yaw` about its centre (x, z), solid from y0 to y1; becomes a fixed collider in the physics world. */
-export type Collider = { x: number; z: number; hw: number; hd: number; yaw: number; y0: number; y1: number };
+/**
+ * Solid box turned by `yaw` about its centre (x, z), solid from y0 to y1; becomes a fixed collider in the physics world.
+ * Ground colliders (a raised sidewalk, say) hold props up but don't block the player, who walks up onto them.
+ */
+export type Collider = { x: number; z: number; hw: number; hd: number; yaw: number; y0: number; y1: number; ground?: boolean };
 
 /** Default top of a collider registered without a height: floor to ceiling. */
 const FULL_HEIGHT = 2.8;
@@ -234,9 +237,9 @@ export class Builder {
   }
 
   /** Register a w x d footprint (rotated by ry around its centre), solid from y0 to y1. */
-  collide(x: number, z: number, w: number, d: number, ry = 0, y0 = 0, y1 = FULL_HEIGHT) {
+  collide(x: number, z: number, w: number, d: number, ry = 0, y0 = 0, y1 = FULL_HEIGHT, ground = false) {
     const p = this.pose(x, z, ry);
-    this.colliders.push({ x: p.x, z: p.z, hw: w / 2, hd: d / 2, yaw: p.yaw, y0, y1 });
+    this.colliders.push({ x: p.x, z: p.z, hw: w / 2, hd: d / 2, yaw: p.yaw, y0, y1, ...(ground && { ground }) });
   }
 
   /** One merged geometry per material; empties the builder. */
