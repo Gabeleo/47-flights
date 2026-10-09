@@ -1,7 +1,12 @@
 import type { Surface } from './player';
 import type { ImpactSound } from './props';
+import type { Ambience } from './world';
 
-// Everything is synthesized: HVAC rumble, fluorescent hum, footsteps, and the city 47 floors down.
+// Everything is synthesized: HVAC rumble, fluorescent hum, footsteps, and the city 47 floors down;
+// or, out on the street, the traffic, the el and the cars going by.
+
+/** A looping noise voice whose loudness, tone and pan the scene sets every frame. */
+type Voice = { gain: GainNode; lp: BiquadFilterNode; pan: StereoPannerNode };
 
 const STEP: Record<Surface, { type: BiquadFilterType; freq: number; vol: number }> = {
   carpet: { type: 'lowpass', freq: 520, vol: 0.35 },
@@ -20,9 +25,12 @@ const IMPACT: Record<ImpactSound, { freq: number; q: number; len: number; vol: n
 };
 
 export class Soundscape {
+  ambience: Ambience = 'office';
   private ctx: AudioContext | null = null;
   private out!: GainNode;
   private noise!: AudioBuffer;
+  private train: (Voice & { squeal: GainNode }) | null = null;
+  private cars: Voice | null = null;
 
   start() {
     if (this.ctx) {
@@ -35,9 +43,93 @@ export class Soundscape {
     this.out.gain.value = 0.8;
     this.out.connect(ctx.destination);
     this.noise = this.makeNoise(2, false);
-    this.hvac();
-    this.hum();
+    if (this.ambience === 'street') {
+      this.streetBed();
+      this.train = { ...this.voice(true), squeal: ctx.createGain() };
+      // Wheels grinding on the curve and the brakes: two detuned squeals that only sound while braking.
+      this.train.squeal.gain.value = 0;
+      for (const f of [2950, 3320]) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = f;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = f;
+        bp.Q.value = 12;
+        o.connect(bp).connect(this.train.squeal);
+        o.start();
+      }
+      this.train.squeal.connect(this.train.pan);
+      this.cars = this.voice(false);
+    } else {
+      this.hvac();
+      this.hum();
+    }
     this.scheduleCity();
+  }
+
+  /** The train on the el: loudness 0..1, how hard it's braking 0..1, and where it is, -1 left to 1 right. */
+  setTrain(level: number, brake: number, pan: number) {
+    const v = this.train;
+    if (!v || this.ctx?.state !== 'running') return;
+    const t = this.ctx.currentTime;
+    v.gain.gain.setTargetAtTime(level * 0.55, t, 0.08);
+    v.lp.frequency.setTargetAtTime(160 + level * 700, t, 0.1);
+    v.squeal.gain.setTargetAtTime(brake * level * 0.012, t, 0.15);
+    v.pan.pan.setTargetAtTime(pan * 0.8, t, 0.1);
+  }
+
+  /** Cars going by on the avenue: loudness 0..1 of the nearest, and which side it's on. */
+  setCars(level: number, pan: number) {
+    const v = this.cars;
+    if (!v || this.ctx?.state !== 'running') return;
+    const t = this.ctx.currentTime;
+    v.gain.gain.setTargetAtTime(level * 0.35, t, 0.12);
+    v.lp.frequency.setTargetAtTime(300 + level * 1400, t, 0.12);
+    v.pan.pan.setTargetAtTime(pan * 0.7, t, 0.12);
+  }
+
+  /** An OMNY reader taking a tap: one short bright beep. */
+  beep() {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.value = 1760;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.03, t + 0.005);
+    g.gain.setValueAtTime(0.03, t + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    o.connect(g).connect(this.out);
+    o.start(t);
+    o.stop(t + 0.18);
+  }
+
+  /** A turnstile's arms turning over: a heavy ratchet clack and a metal ring. */
+  clunk() {
+    this.impact('metal', 4, 0.5);
+    this.impact('thud', 5, 0.5);
+  }
+
+  /** The doors on the el: two falling tones, then a pause, the way they do it at 36 Av. */
+  chime(level: number) {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running' || level < 0.01) return;
+    [[659, 0], [523, 0.32]].forEach(([f, dt]) => {
+      const t = ctx.currentTime + dt;
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.06 * level, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+      o.connect(g).connect(this.out);
+      o.start(t);
+      o.stop(t + 0.65);
+    });
   }
 
   pause() {
@@ -160,6 +252,53 @@ export class Soundscape {
     return buf;
   }
 
+  private voice(brown: boolean): Voice {
+    const ctx = this.ctx!;
+    const src = ctx.createBufferSource();
+    src.buffer = this.makeNoise(4, brown);
+    src.loop = true;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 400;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    const pan = ctx.createStereoPanner();
+    src.connect(lp).connect(gain).connect(pan).connect(this.out);
+    src.start();
+    return { gain, lp, pan };
+  }
+
+  /** Out on the street at night: the city's low roar, a little wind, and a transformer buzzing somewhere. */
+  private streetBed() {
+    const ctx = this.ctx!;
+    const roar = this.voice(true);
+    roar.lp.frequency.value = 520;
+    roar.gain.gain.value = 0.16;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.05;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.05;
+    lfo.connect(depth).connect(roar.gain.gain);
+    lfo.start();
+    const wind = this.voice(false);
+    wind.lp.type = 'bandpass';
+    wind.lp.frequency.value = 650;
+    wind.lp.Q.value = 0.6;
+    wind.gain.gain.value = 0.012;
+    const gust = ctx.createOscillator();
+    gust.frequency.value = 0.11;
+    const gustDepth = ctx.createGain();
+    gustDepth.gain.value = 0.008;
+    gust.connect(gustDepth).connect(wind.gain.gain);
+    gust.start();
+    const o = ctx.createOscillator();
+    o.frequency.value = 120;
+    const g = ctx.createGain();
+    g.gain.value = 0.002;
+    o.connect(g).connect(this.out);
+    o.start();
+  }
+
   private hvac() {
     const ctx = this.ctx!;
     const src = ctx.createBufferSource();
@@ -204,7 +343,7 @@ export class Soundscape {
     next();
   }
 
-  /** A distant wailing siren, muffled by the glass. */
+  /** A distant wailing siren, muffled by the glass up in the office. */
   private siren() {
     const ctx = this.ctx!;
     const t = ctx.currentTime;
@@ -217,12 +356,13 @@ export class Soundscape {
     const depth = ctx.createGain();
     depth.gain.value = 320;
     lfo.connect(depth).connect(o.frequency);
+    const near = this.ambience === 'street';
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 1100;
+    lp.frequency.value = near ? 2400 : 1100;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.02, t + dur * 0.4);
+    g.gain.exponentialRampToValueAtTime(near ? 0.035 : 0.02, t + dur * 0.4);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     const pan = ctx.createStereoPanner();
     pan.pan.setValueAtTime(Math.random() * 1.6 - 0.8, t);
@@ -234,23 +374,25 @@ export class Soundscape {
     lfo.stop(t + dur);
   }
 
-  /** One or two taxi honks far below. */
+  /** One or two honks, far below the office or a few blocks off on the street. */
   private horn() {
     const ctx = this.ctx!;
     const honks = 1 + Math.floor(Math.random() * 2);
     const pan = ctx.createStereoPanner();
     pan.pan.value = Math.random() * 1.6 - 0.8;
+    const near = this.ambience === 'street';
+    const vol = near ? 0.03 : 0.012;
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 650;
+    lp.frequency.value = near ? 1800 : 650;
     lp.connect(pan).connect(this.out);
     for (let i = 0; i < honks; i++) {
       const t = ctx.currentTime + i * 0.35;
       const len = 0.18 + Math.random() * 0.3;
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.linearRampToValueAtTime(0.012, t + 0.02);
-      g.gain.setValueAtTime(0.012, t + len);
+      g.gain.linearRampToValueAtTime(vol, t + 0.02);
+      g.gain.setValueAtTime(vol, t + len);
       g.gain.linearRampToValueAtTime(0.0001, t + len + 0.05);
       g.connect(lp);
       for (const f of [349, 440]) {

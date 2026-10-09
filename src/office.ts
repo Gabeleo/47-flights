@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { Builder, boxGeo, type Rect, type SurfaceArea, type Tile } from './geometry';
 import { makeMaterials } from './materials';
-import type { Level } from './level';
 import type { Surface } from './player';
-import type { PropSpawn } from './props';
+import { propTemplates, type PropSpawn } from './props';
+import { FOG_COLOR, buildSkyline } from './skyline';
 import { mulberry32 } from './textures';
+import type { World } from './world';
 
 // Floor plate: 40m x 28m, centred on the origin, with a service core in the middle.
 // Elevator hallway runs north-south through it. The floor is at y = 0, 47 storeys above the street.
@@ -45,7 +46,7 @@ const ARM_POLE_BACK = 0.2;
 
 type DeskKind = 'off' | 'lock' | 'code' | 'dash' | 'empty' | 'mine';
 
-export function buildOffice(): Level {
+export function buildOffice() {
   const b = new Builder();
   const M = makeMaterials();
   const r = mulberry32(47);
@@ -597,17 +598,48 @@ export function buildOffice(): Level {
   }
 
   return {
-    subtitle: 'HALCYON &middot; FLOOR 47 &middot; 2:13 AM',
     group,
     colliders: b.colliders,
     props,
     materials: M,
-    ground: [[-25, -20, 25, 20]],
-    ceiling: H,
-    walkable: [-HX + 0.4, -HZ + 0.4, HX - 0.4, HZ - 0.4],
-    elevation: 180,
     update,
     surfaceAt,
     spawn: { x: 0, z: 2.6, yaw: Math.PI },
+  };
+}
+
+/** Floor 47 at 2am, with Manhattan all around and 47 storeys below. */
+export function officeWorld(): World {
+  const office = buildOffice();
+  const city = buildSkyline(180);
+  const group = new THREE.Group();
+  group.add(office.group, city.group);
+
+  // Night: cool ambient, moonlight through the glass, orange street glow bouncing up onto the ceiling.
+  group.add(new THREE.AmbientLight(0x7884aa, 0.9));
+  const moonlight = new THREE.DirectionalLight(0x9aa8d8, 0.45);
+  moonlight.position.set(-0.45, 0.5, 0.87);
+  group.add(moonlight);
+  const streetGlow = new THREE.DirectionalLight(0xd89a70, 0.14);
+  streetGlow.position.set(0.2, -1, -0.3);
+  group.add(streetGlow);
+
+  return {
+    subtitle: 'HALCYON &middot; FLOOR 47 &middot; 2:13 AM',
+    group,
+    colliders: office.colliders,
+    props: office.props,
+    templates: propTemplates(office.materials),
+    floor: [-25, -20, 25, 20],
+    ceiling: H,
+    walkable: [-HX + 0.4, -HZ + 0.4, HX - 0.4, HZ - 0.4],
+    fog: { color: FOG_COLOR, density: 0.0012 },
+    ambience: 'office',
+    spawn: office.spawn,
+    surfaceAt: office.surfaceAt,
+    update: (t, dt, camera) => {
+      office.update(t, dt);
+      city.update(t, dt, camera);
+    },
   };
 }

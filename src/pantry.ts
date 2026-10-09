@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { Builder, boxGeo, type Rect, type SurfaceArea } from './geometry';
-import type { Level } from './level';
 import { decal, makeMaterials } from './materials';
-import type { PropSpawn } from './props';
+import type { Bounds } from './physics';
+import { propTemplates, type PropSpawn } from './props';
+import { FOG_COLOR, buildSkyline } from './skyline';
 import { mulberry32, pantryTextures } from './textures';
+import type { World } from './world';
 
 // Bloomberg's pantry at 919 Third Avenue, from SL Green's photos of the space: a long room down the window
 // wall under a timber-slat ceiling, a white back counter on a curved wall, curved white islands glowing at
@@ -43,6 +45,9 @@ const TANK = { x: -9.7, z: -3.4, w: 1.0, d: 2.4 };
 const OFFICE_X = BX1 + WALL_T;
 
 const COUNTER_Y = 0.92;
+
+/** Floor 15: a tall lobby, then 12' floor to floor. */
+const ELEVATION = 54;
 
 /** Outline of a slab from x0 to x1 and z0 to z1, its ends rounded to half its depth where asked. */
 function slabOutline(x0: number, z0: number, x1: number, z1: number, round: [boolean, boolean] = [true, true], seg = 8) {
@@ -105,7 +110,8 @@ function pantryMaterials() {
   };
 }
 
-export function buildPantry(): Level {
+/** Bloomberg's pantry on 15 at 2am, with Midtown East outside. */
+export function pantryWorld(): World {
   const b = new Builder();
   const M = makeMaterials();
   const P = pantryMaterials();
@@ -512,33 +518,48 @@ export function buildPantry(): Level {
 
   // ---------------------------------------------------------------- assemble
 
+  // The floor slab has the stairwell cut out of it, so the scene's own ground is only the part east of the
+  // opening; the rest of the slab, and the ceiling over all of it, are colliders here.
+  const out: Bounds = [-XW - 0.5, ZC - 0.5, XW + 0.5, ZW + 0.5];
+  const slab = ([x0, z0, x1, z1]: Bounds, y0: number, y1: number) =>
+    b.collide((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, 0, y0, y1);
+  slab([out[0], out[1], SX1, SZ0], -1, 0);
+  slab([out[0], SZ1, SX1, out[3]], -1, 0);
+  slab([out[0], SZ0, SX0, SZ1], -1, 0);
+  slab(out, H, H + 1);
+
   const group = b.build();
   for (const l of lights) group.add(l);
   group.add(fishGroup);
+  const city = buildSkyline(ELEVATION);
+  group.add(city.group);
+  // Night: cool ambient, moonlight through the glass, orange street glow from Third Avenue below.
+  group.add(new THREE.AmbientLight(0x7884aa, 0.9));
+  const moonlight = new THREE.DirectionalLight(0x9aa8d8, 0.45);
+  moonlight.position.set(-0.45, 0.5, 0.87);
+  group.add(moonlight);
+  const streetGlow = new THREE.DirectionalLight(0xd89a70, 0.2);
+  streetGlow.position.set(0.2, -1, -0.3);
+  group.add(streetGlow);
   const ticker = M.newsTicker.map!;
 
   const walls = 0.3;
-  const out: Rect = [-XW - 0.5, ZC - 0.5, XW + 0.5, ZW + 0.5];
   return {
     subtitle: 'BLOOMBERG &middot; 919 THIRD AVE &middot; FLOOR 15 PANTRY &middot; 2:13 AM',
     group,
     colliders: b.colliders,
     props,
-    materials: M,
-    ground: [
-      [out[0], out[1], out[2], SZ0],
-      [out[0], SZ1, out[2], out[3]],
-      [out[0], SZ0, SX0, SZ1],
-      [SX1, SZ0, out[2], SZ1],
-    ],
-    ceiling: H,
+    templates: propTemplates(M),
+    floor: [SX1, out[1], out[2], out[3]],
     walkable: [-XW + walls, ZC + walls, XW - walls, ZP - walls],
-    elevation: 54,
+    fog: { color: FOG_COLOR, density: 0.0012 },
+    ambience: 'office',
     spawn: { x: -6.8, z: 3.2, yaw: -Math.PI / 2 },
     surfaceAt: (x) => (x > OFFICE_X ? 'carpet' : 'stone'),
-    update: (t, dt) => {
+    update: (t, dt, camera) => {
       ticker.offset.x = (ticker.offset.x + dt * 0.04) % 1;
       swim(t);
+      city.update(t, dt, camera);
     },
   };
 }

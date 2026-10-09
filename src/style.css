@@ -78,19 +78,23 @@ canvas {
   margin-top: 6px;
 }
 
-#overlay .levels {
-  margin-top: 34px;
-  font-size: 22px;
+#overlay .scenes {
+  margin-top: 36px;
+  font-size: 24px;
   letter-spacing: 0.15em;
-  color: #55606e;
+  color: #5b6573;
 }
 
-#overlay .levels a {
-  color: #7d8794;
+#overlay .scenes a {
+  color: #8fa3b3;
   text-decoration: none;
 }
 
-#overlay .levels a:hover,
-#overlay .levels a.current {
+#overlay .scenes a:hover {
   color: #eef1f6;
+}
+
+#overlay .scenes a.current {
+  color: #eef1f6;
+  text-shadow: 2px 2px 0 #1e525c;
 }

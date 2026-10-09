@@ -4,8 +4,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 /** World-space size of one texture repeat; a single number means square tiles. */
 export type Tile = number | [number, number];
 
-/** Solid box turned by `yaw` about its centre (x, z), solid from y0 to y1; becomes a fixed collider in the physics world. */
-export type Collider = { x: number; z: number; hw: number; hd: number; yaw: number; y0: number; y1: number };
+/**
+ * Solid box turned by `yaw` about its centre (x, z), solid from y0 to y1; becomes a fixed collider in the physics world.
+ * Ground colliders (a raised sidewalk, say) hold props up but don't block the player, who walks up onto them.
+ */
+export type Collider = { x: number; z: number; hw: number; hd: number; yaw: number; y0: number; y1: number; ground?: boolean };
 
 /** Axis-aligned rectangle on the floor plan: x0, z0, x1, z1. */
 export type Rect = [number, number, number, number];
@@ -133,6 +136,13 @@ export function mergeToMesh(geos: THREE.BufferGeometry[], mat: THREE.Material) {
  */
 export type SurfaceArea = { mat: THREE.Material | null; rect: Rect; tile: Tile; origin?: [number, number] };
 
+/** Box from a to c (x, y, z) of section w x h, for knee braces, stair stringers and lamp arms. */
+export function strut(b: Builder, mat: THREE.Material, a: number[], c: number[], w: number, h: number) {
+  const [dx, dy, dz] = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  const flat = Math.hypot(dx, dz);
+  b.add(boxGeo(w, h, Math.hypot(flat, dy)), mat, (a[0] + c[0]) / 2, (a[1] + c[1]) / 2, (a[2] + c[2]) / 2, Math.atan2(dx, dz), -Math.atan2(dy, flat));
+}
+
 const _m = new THREE.Matrix4();
 const _m2 = new THREE.Matrix4();
 const _e = new THREE.Euler();
@@ -244,9 +254,9 @@ export class Builder {
   }
 
   /** Register a w x d footprint (rotated by ry around its centre), solid from y0 to y1. */
-  collide(x: number, z: number, w: number, d: number, ry = 0, y0 = 0, y1 = FULL_HEIGHT) {
+  collide(x: number, z: number, w: number, d: number, ry = 0, y0 = 0, y1 = FULL_HEIGHT, ground = false) {
     const p = this.pose(x, z, ry);
-    this.colliders.push({ x: p.x, z: p.z, hw: w / 2, hd: d / 2, yaw: p.yaw, y0, y1 });
+    this.colliders.push({ x: p.x, z: p.z, hw: w / 2, hd: d / 2, yaw: p.yaw, y0, y1, ...(ground && { ground }) });
   }
 
   /** One merged geometry per material; empties the builder. */
